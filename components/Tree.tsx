@@ -7,12 +7,13 @@ import { TreeState } from '../types';
 
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-// 🔴 优化配置：数量大幅增加，尺寸减小
-const COUNT_A = isMobile ? 600 : 1200;   // 丝带：变多
-const COUNT_B = isMobile ? 2500 : 8500;  // 星云：大幅变多
-const COUNT_C = isMobile ? 2000 : 8000;  // 闪光：大幅变多
-const BOKEH_COUNT = isMobile ? 150 : 300; 
+// 🟢 细腻平衡版配置
+const COUNT_A = isMobile ? 1200 : 1500;   // 丝带
+const COUNT_B = isMobile ? 3000 : 8500;   // 星云
+const COUNT_C = isMobile ? 2000 : 8000;   // 闪光
+const BOKEH_COUNT = isMobile ? 100 : 300; 
 
+// PC端 Shader (手机端不使用)
 const ribbonShader = {
   uniforms: {
     uTime: { value: 0 },
@@ -52,6 +53,26 @@ export const ChristmasTree: React.FC = () => {
   const sparkleRef = useRef<THREE.Points>(null!);
   const starRef = useRef<THREE.Group>(null!);
   const bokehRef = useRef<THREE.Points>(null!);
+
+  // 🟢 魔法代码：生成一个柔光纹理，让粒子不再是方块，而是光球
+  const glowTexture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+        // 画一个径向渐变，中心白，边缘透明
+        const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.5)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 32, 32);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter; // 保证性能
+    return texture;
+  }, []);
 
   const isCinematic = state === TreeState.SCATTERED;
 
@@ -187,8 +208,15 @@ export const ChristmasTree: React.FC = () => {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={BOKEH_COUNT} array={bokehData.pos} itemSize={3} />
         </bufferGeometry>
-        {/* 调小背景粒子 */}
-        <pointsMaterial color="#ffd700" size={isMobile ? 0.6 : 0.4} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <pointsMaterial 
+            color="#ffd700" 
+            map={glowTexture} // 应用柔光贴图
+            size={isMobile ? 1.5 : 0.4} 
+            transparent 
+            opacity={0.3} 
+            blending={THREE.AdditiveBlending} 
+            depthWrite={false} 
+        />
       </points>
 
       {/* 2. 金色丝带 */}
@@ -202,10 +230,11 @@ export const ChristmasTree: React.FC = () => {
         {isMobile ? (
           <pointsMaterial 
             color="#FFD700" 
-            size={0.25} // 🔴 缩小尺寸：0.4 -> 0.25，更精致
+            map={glowTexture} // 关键：使用柔光贴图
+            size={0.5} // 尺寸适中，比方块细腻
             transparent 
-            opacity={0.8} 
-            blending={THREE.AdditiveBlending} 
+            opacity={0.9} // 提高不透明度，因为贴图边缘是透明的
+            blending={THREE.AdditiveBlending} // 关键：叠加发光模式
             depthWrite={false} 
             sizeAttenuation={true}
           />
@@ -219,8 +248,15 @@ export const ChristmasTree: React.FC = () => {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_B} array={systemB.currPos} itemSize={3} />
         </bufferGeometry>
-        {/* 🔴 缩小尺寸：0.3 -> 0.15 */}
-        <pointsMaterial color="#0077BE" size={isMobile ? 0.15 : 0.11} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <pointsMaterial 
+            color="#0077BE" 
+            map={glowTexture} 
+            size={isMobile ? 0.3 : 0.11} 
+            transparent 
+            opacity={0.6} 
+            blending={THREE.AdditiveBlending} 
+            depthWrite={false} 
+        />
       </points>
 
       {/* 4. 金色闪光 */}
@@ -228,8 +264,15 @@ export const ChristmasTree: React.FC = () => {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_C} array={systemC.currPos} itemSize={3} />
         </bufferGeometry>
-        {/* 🔴 缩小尺寸：0.2 -> 0.12 */}
-        <pointsMaterial color="#FFD700" size={isMobile ? 0.12 : 0.05} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <pointsMaterial 
+            color="#FFD700" 
+            map={glowTexture}
+            size={isMobile ? 0.25 : 0.05} 
+            transparent 
+            opacity={0.9} 
+            blending={THREE.AdditiveBlending} 
+            depthWrite={false} 
+        />
       </points>
 
       {/* 5. 顶部星星 */}
@@ -238,7 +281,8 @@ export const ChristmasTree: React.FC = () => {
           <mesh rotation={[0, 0, 0]} position={[0, 0, -0.06]}>
             <extrudeGeometry args={[starShape, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 5 }]} />
             {isMobile ? (
-               <meshBasicMaterial color="#FFD700" /> 
+               // 手机端使用基础材质，但也给一点点自发光感
+               <meshBasicMaterial color="#FFD700" toneMapped={false} /> 
             ) : (
                <meshStandardMaterial 
                 color="#FFD700" 
@@ -254,8 +298,8 @@ export const ChristmasTree: React.FC = () => {
         </group>
       </Float>
 
-      <Sparkles count={isMobile ? 600 : 1200} scale={20} size={isMobile ? 5 : 4} speed={0.5} color="#ffd700" opacity={0.2} />
-      <Stars radius={150} depth={50} count={isMobile ? 2000 : 10000} factor={6} saturation={0} fade speed={1} />
+      <Sparkles count={isMobile ? 500 : 1200} scale={20} size={isMobile ? 15 : 4} speed={0.5} color="#ffd700" opacity={0.3} />
+      <Stars radius={150} depth={50} count={isMobile ? 1500 : 10000} factor={6} saturation={0} fade speed={1} />
     </group>
   );
 };
