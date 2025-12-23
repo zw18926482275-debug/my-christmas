@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, VolumeX, RefreshCcw, Music, ChevronRight } from 'lucide-react';
-import { useAppState } from './Store.tsx';
-import { TreeState, ChristmasSong } from '../types.ts';
-import { selectBestBlessing } from '../services/geminiService.ts';
+import { useAppState } from './Store';
+import { TreeState, ChristmasSong } from '../types';
+import { selectBestBlessing } from '../services/geminiService';
 
 const PREDEFINED_BLESSINGS = [
   "岁末雪落，静候春信.愿圣诞的宁静烛火，为你照亮一整个温和的良夜.",
@@ -81,7 +80,13 @@ export const UIOverlay: React.FC = () => {
   const isCinematic = state === TreeState.SCATTERED;
 
   return (
-    <div className="fixed inset-0 pointer-events-none flex flex-col justify-between p-8 md:p-16 z-10 overflow-hidden">
+    // 🔴 核心修复点在这里：
+    // px-6: 左右保持距离
+    // pt-14: 顶部大幅增加距离 (约 56px)，避开 iPhone 的刘海和灵动岛
+    // pb-8: 底部保持距离
+    // md:p-16: 电脑端保持原来的大间距
+    <div className="fixed inset-0 pointer-events-none flex flex-col justify-between px-6 pt-14 pb-8 md:p-16 z-10 overflow-hidden">
+      
       <div className="flex justify-between items-start pointer-events-auto">
         <motion.div 
           animate={{ opacity: isCinematic ? 0 : 1, x: isCinematic ? -50 : 0 }}
@@ -93,17 +98,18 @@ export const UIOverlay: React.FC = () => {
           <div className="w-32 h-[4px] bg-[#FFCC00] mt-2 shadow-[0_0_15px_rgba(255,204,0,0.6)]" />
         </motion.div>
         
+        {/* 右上角按钮组 */}
         <div className="flex gap-4 relative">
           <button 
             onClick={toggleCinematicMode}
-            className={`flex items-center gap-2 px-8 py-3 rounded-full border transition-all text-[11px] font-bold uppercase tracking-[0.3em] ${
+            className={`flex items-center gap-2 px-6 py-3 rounded-full border transition-all text-[11px] font-bold uppercase tracking-[0.3em] ${
               isCinematic 
               ? 'bg-[#ffd700] text-[#010806] border-[#ffd700] shadow-[0_0_30px_rgba(255,215,0,0.6)]' 
               : 'bg-transparent text-[#ffd700] border-[#ffd700]/30 hover:border-[#ffd700]'
             }`}
           >
             {isCinematic ? <RefreshCcw size={14} /> : <Sparkles size={14} />}
-            {isCinematic ? '返回界面' : '圣诞树'}
+            {isCinematic ? '返回' : '圣诞树'}
           </button>
           
           <div className="relative">
@@ -126,41 +132,42 @@ export const UIOverlay: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.9, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                  className="absolute right-0 mt-4 w-72 bg-black/95 backdrop-blur-3xl border border-[#ffd700]/30 rounded-[2rem] p-6 shadow-[0_30px_100px_rgba(0,0,0,0.9)] z-50 overflow-hidden"
+                  // 这里的 right-0 确保菜单向左展开，不会溢出屏幕
+                  className="absolute right-0 mt-4 w-64 md:w-72 bg-black/95 backdrop-blur-3xl border border-[#ffd700]/30 rounded-[2rem] p-6 shadow-[0_30px_100px_rgba(0,0,0,0.9)] z-50 overflow-hidden"
                 >
                   <div className="flex flex-col gap-4">
                     <div className="flex justify-between items-end border-b border-[#ffd700]/20 pb-3">
                       <h3 className="text-[10px] uppercase tracking-[0.5em] text-[#ffd700]">圣诞歌单</h3>
-                      {isPlaying && <span className="text-[8px] uppercase tracking-widest text-[#ffd700] animate-pulse">Now Playing</span>}
+                      {isPlaying && <span className="text-[8px] uppercase tracking-widest text-[#ffd700] animate-pulse">Playing</span>}
                     </div>
                     
                     <button 
                       onClick={() => selectSong('all-i-want')}
-                      className={`w-full text-left px-5 py-4 rounded-2xl transition-all flex items-center justify-between group border ${currentSong === 'all-i-want' ? 'bg-[#ffd700]/15 border-[#ffd700]/50' : 'hover:bg-white/5 border-transparent'}`}
+                      className={`w-full text-left px-4 py-3 rounded-2xl transition-all flex items-center justify-between group border ${currentSong === 'all-i-want' ? 'bg-[#ffd700]/15 border-[#ffd700]/50' : 'hover:bg-white/5 border-transparent'}`}
                     >
-                      <div className="flex flex-col">
-                        <span className="text-[9px] uppercase tracking-widest text-white/40 mb-1 group-hover:text-white/70 transition-colors">Mariah Carey</span>
-                        <span className={`text-sm font-serif italic tracking-wide ${currentSong === 'all-i-want' ? 'text-[#ffd700]' : 'text-white/90'}`}>All I Want For Christmas</span>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className="text-[9px] uppercase tracking-widest text-white/40 mb-1">Mariah Carey</span>
+                        <span className={`text-sm font-serif italic tracking-wide truncate ${currentSong === 'all-i-want' ? 'text-[#ffd700]' : 'text-white/90'}`}>All I Want...</span>
                       </div>
-                      <ChevronRight size={14} className="text-white/20 group-hover:text-white" />
+                      <ChevronRight size={14} className="text-white/20 shrink-0" />
                     </button>
                     
                     <button 
                       onClick={() => selectSong('santa-tell-me')}
-                      className={`w-full text-left px-5 py-4 rounded-2xl transition-all flex items-center justify-between group border ${currentSong === 'santa-tell-me' ? 'bg-[#ffd700]/15 border-[#ffd700]/50' : 'hover:bg-white/5 border-transparent'}`}
+                      className={`w-full text-left px-4 py-3 rounded-2xl transition-all flex items-center justify-between group border ${currentSong === 'santa-tell-me' ? 'bg-[#ffd700]/15 border-[#ffd700]/50' : 'hover:bg-white/5 border-transparent'}`}
                     >
-                      <div className="flex flex-col">
-                        <span className="text-[9px] uppercase tracking-widest text-white/40 mb-1 group-hover:text-white/70 transition-colors">Ariana Grande</span>
-                        <span className={`text-sm font-serif italic tracking-wide ${currentSong === 'santa-tell-me' ? 'text-[#ffd700]' : 'text-white/90'}`}>Santa Tell Me</span>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className="text-[9px] uppercase tracking-widest text-white/40 mb-1">Ariana Grande</span>
+                        <span className={`text-sm font-serif italic tracking-wide truncate ${currentSong === 'santa-tell-me' ? 'text-[#ffd700]' : 'text-white/90'}`}>Santa Tell Me</span>
                       </div>
-                      <ChevronRight size={14} className="text-white/20 group-hover:text-white" />
+                      <ChevronRight size={14} className="text-white/20 shrink-0" />
                     </button>
 
                     <button 
                       onClick={() => { setIsPlaying(!isPlaying); setShowMusicMenu(false); }}
                       className="w-full text-center py-2 text-[10px] uppercase tracking-[0.4em] text-white/30 hover:text-[#ffd700] transition-colors"
                     >
-                      {isPlaying ? '停止音乐' : (currentSong ? '继续播放' : '点击上方歌曲播放')}
+                      {isPlaying ? '暂停' : '播放'}
                     </button>
                   </div>
                 </motion.div>
@@ -170,7 +177,8 @@ export const UIOverlay: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center pointer-events-none">
+        {/* 中间的内容区域保持不变，但要确保 pointer-events 设置正确以免遮挡 Canvas */}
         <AnimatePresence mode="wait">
           {!isCinematic && (
             <motion.div 
@@ -178,29 +186,29 @@ export const UIOverlay: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center justify-center h-full"
+              className="w-full flex flex-col items-center justify-center h-full pointer-events-none"
             >
               {(state === TreeState.IDLE || state === TreeState.TREE_SHAPE || state === TreeState.REASSEMBLING) && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-black/60 backdrop-blur-3xl border border-[#ffd700]/40 p-12 rounded-[3rem] max-w-md w-full pointer-events-auto shadow-[0_40px_120px_rgba(0,0,0,1)] text-center"
+                  className="bg-black/60 backdrop-blur-3xl border border-[#ffd700]/40 p-8 md:p-12 rounded-[2rem] md:rounded-[3rem] max-w-sm md:max-w-md w-full pointer-events-auto shadow-[0_40px_120px_rgba(0,0,0,1)] text-center mx-4"
                 >
-                  <h2 className="text-3xl font-serif text-[#fefae0] mb-2 italic tracking-tight">开启圣诞祝福</h2>
-                  <p className="text-[10px] text-[#ffd700] mb-10 uppercase tracking-[0.5em] font-light">
+                  <h2 className="text-2xl md:text-3xl font-serif text-[#fefae0] mb-2 italic tracking-tight">开启圣诞祝福</h2>
+                  <p className="text-[10px] text-[#ffd700] mb-8 uppercase tracking-[0.5em] font-light">
                     请输入您的姓名
                   </p>
-                  <div className="space-y-8">
+                  <div className="space-y-6 md:space-y-8">
                     <input 
                       type="text"
                       placeholder="姓名"
                       value={userName}
                       onChange={(e) => setUserName(e.target.value)}
-                      className="w-full bg-white/5 border-b border-[#ffd700]/60 py-4 text-center text-[#fefae0] focus:outline-none focus:border-[#ffd700] tracking-[0.5em] uppercase text-lg"
+                      className="w-full bg-white/5 border-b border-[#ffd700]/60 py-3 text-center text-[#fefae0] focus:outline-none focus:border-[#ffd700] tracking-[0.5em] uppercase text-lg"
                     />
                     <button 
                       onClick={handleConsultOracle}
-                      className="w-full bg-gradient-to-r from-[#ffd700] to-[#f5cb5c] text-[#010806] font-black py-6 rounded-full flex items-center justify-center gap-4 shadow-lg uppercase text-xs tracking-[0.4em]"
+                      className="w-full bg-gradient-to-r from-[#ffd700] to-[#f5cb5c] text-[#010806] font-black py-4 md:py-6 rounded-full flex items-center justify-center gap-4 shadow-lg uppercase text-xs tracking-[0.4em]"
                     >
                       <Sparkles size={18} />
                       点亮祝福
@@ -211,7 +219,7 @@ export const UIOverlay: React.FC = () => {
 
               {loading && (
                 <div className="flex flex-col items-center gap-8 text-[#ffd700]">
-                  <RefreshCcw className="animate-spin" size={64} />
+                  <RefreshCcw className="animate-spin" size={48} />
                   <p className="font-serif italic tracking-[0.6em] text-xs">正在感应星光...</p>
                 </div>
               )}
@@ -220,21 +228,21 @@ export const UIOverlay: React.FC = () => {
                 <motion.div 
                   initial={{ opacity: 0, y: 50 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="max-w-4xl w-full text-right pointer-events-auto self-end mb-20"
+                  className="w-full text-right pointer-events-auto self-end mb-10 md:mb-20 px-4"
                 >
-                   <div className="flex flex-col items-end gap-6 bg-black/70 backdrop-blur-xl p-10 md:p-20 rounded-[4rem] border border-white/20">
-                      <div className="flex items-center gap-8">
-                        <span className="text-6xl md:text-9xl font-script text-[#ffd700]">To</span>
-                        <span className="text-5xl md:text-8xl font-artistic text-white">{userName}:</span>
+                   <div className="flex flex-col items-end gap-4 md:gap-6 bg-black/70 backdrop-blur-xl p-6 md:p-20 rounded-[2rem] md:rounded-[4rem] border border-white/20">
+                      <div className="flex items-center gap-4 md:gap-8">
+                        <span className="text-4xl md:text-9xl font-script text-[#ffd700]">To</span>
+                        <span className="text-3xl md:text-8xl font-artistic text-white">{userName}:</span>
                       </div>
-                      <p className="text-3xl md:text-6xl font-artistic text-[#fefae0] leading-snug tracking-wider italic">
+                      <p className="text-xl md:text-6xl font-artistic text-[#fefae0] leading-snug tracking-wider italic text-right">
                         {userBlessing}
                       </p>
                       <button 
                         onClick={reset}
-                        className="mt-8 px-16 py-5 rounded-full border border-[#ffd700]/60 text-[#ffd700] hover:bg-[#ffd700] hover:text-[#010806] uppercase text-[12px] tracking-[0.5em] flex items-center gap-4 font-black"
+                        className="mt-6 md:mt-8 px-10 md:px-16 py-4 md:py-5 rounded-full border border-[#ffd700]/60 text-[#ffd700] hover:bg-[#ffd700] hover:text-[#010806] uppercase text-[10px] md:text-[12px] tracking-[0.5em] flex items-center gap-4 font-black"
                       >
-                        <RefreshCcw size={20} /> 重新开启
+                        <RefreshCcw size={16} /> 重新开启
                       </button>
                    </div>
                 </motion.div>
@@ -247,7 +255,7 @@ export const UIOverlay: React.FC = () => {
       <div className="flex justify-between items-end">
         <motion.div 
           animate={{ opacity: isCinematic ? 0 : 1 }}
-          className="text-sm md:text-base uppercase tracking-[0.6em] text-[#ffd700] font-bold"
+          className="text-xs md:text-base uppercase tracking-[0.6em] text-[#ffd700] font-bold"
         >
           {userName === '储星宇' ? '专属定制' : 'From 萨莱'}
         </motion.div>
