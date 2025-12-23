@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
       // ⚠️ 关键修改：填入你的 GitHub 仓库名称，前后都要加斜杠
       // 如果你的仓库链接是 https://github.com/你的用户名/merry-christmas
       // 这里就填 '/merry-christmas/'
-      base: '/merry-christmas/', 
+      base: './',
 
       server: {
         port: 3000,
