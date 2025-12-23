@@ -1,14 +1,30 @@
-import React, { Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei';
-import { Bloom, EffectComposer, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing';
+import React, { Suspense, useRef } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { ChristmasTree } from './Tree';
 import { useAppState } from './Store';
 import { TreeState } from '../types';
 
-// 严格检测手机
+// 简单的手机检测
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+// 一个绝对不会出错的测试方块组件
+const TestBox = () => {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.rotation.x += 0.02;
+      meshRef.current.rotation.y += 0.02;
+    }
+  });
+  return (
+    <mesh ref={meshRef} position={[0, 0, 0]}>
+      <boxGeometry args={[2, 2, 2]} />
+      <meshBasicMaterial color="#00ff00" wireframe />
+    </mesh>
+  );
+};
 
 export const Scene: React.FC = () => {
   const { state, isExploded, setIsExploded } = useAppState();
@@ -21,54 +37,38 @@ export const Scene: React.FC = () => {
 
   return (
     <Canvas 
-      shadows 
       className="w-full h-full bg-[#000205]"
       onPointerDown={handlePointerDown}
+      // 强制使用最保守的渲染参数，防止崩溃
       gl={{ 
-        antialias: false, // 手机端绝对不开抗锯齿
-        toneMapping: THREE.ACESFilmicToneMapping,
-        outputColorSpace: THREE.SRGBColorSpace,
-        powerPreference: "low-power", // 🔴 强制低功耗模式，防止显存崩溃
-        preserveDrawingBuffer: true   // 🔴 防止切换多任务时黑屏
+        antialias: false,
+        powerPreference: "low-power",
+        preserveDrawingBuffer: true
       }}
-      // 限制 DPR，太高会卡死
-      dpr={isMobile ? [1, 1.5] : [1, 2]} 
+      dpr={[1, 1.5]} 
     >
-      {/* 🔴 关键修改：手机端相机拉远到 24，否则竖屏可能看不见树 */}
-      <PerspectiveCamera makeDefault position={[0, 1.5, isMobile ? 24 : 14]} fov={35} />
+      <PerspectiveCamera makeDefault position={[0, 1.5, isMobile ? 25 : 14]} fov={35} />
       
       <OrbitControls 
         enablePan={false} 
-        minDistance={8} 
-        maxDistance={30} // 允许拉得更远
-        autoRotate={!isExploded} 
-        autoRotateSpeed={0.4}
-        maxPolarAngle={Math.PI / 1.7}
+        minDistance={5} 
+        maxDistance={40} 
+        autoRotate={!isExploded}
+        autoRotateSpeed={0.5}
       />
       
+      {/* 🔴 1. 这个绿色方块在 Suspense 外面。只要 Canvas 能跑，它就一定显示 */}
+      <TestBox />
+
       <Suspense fallback={null}>
-        <ambientLight intensity={0.1} />
-        <pointLight position={[0, 0, 0]} color="#0055ff" intensity={5} distance={15} />
-        <spotLight position={[0, 20, 0]} angle={0.15} penumbra={1} intensity={8} color="#ffffff" />
+        <ambientLight intensity={0.5} />
+        <pointLight position={[10, 10, 10]} intensity={1} />
         
+        {/* 🔴 2. 圣诞树组件 */}
         <ChristmasTree />
         
-        {/* 手机端完全移除阴影 */}
-        {!isMobile && (
-          <ContactShadows opacity={0.4} scale={25} blur={3} far={10} resolution={512} color="#000000" />
-        )}
-        
-        <Environment preset="night" />
-        
-        {/* 手机端完全移除后期特效 */}
-        {!isMobile && (
-          <EffectComposer enableNormalPass={false} multisampling={4}>
-            <Bloom luminanceThreshold={0.1} mipmapBlur intensity={2.5} radius={0.4} />
-            <ChromaticAberration offset={new THREE.Vector2(0.0008, 0.0008)} />
-            <Noise opacity={0.015} />
-            <Vignette eskil={false} offset={0.1} darkness={1.2} />
-          </EffectComposer>
-        )}
+        {/* 只有 PC 端才加载环境贴图，手机端省去加载资源 */}
+        {!isMobile && <Environment preset="night" />}
       </Suspense>
     </Canvas>
   );
