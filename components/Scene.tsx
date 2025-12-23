@@ -7,7 +7,6 @@ import { ChristmasTree } from './Tree';
 import { useAppState } from './Store';
 import { TreeState } from '../types';
 
-// 严格检测手机
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
 export const Scene: React.FC = () => {
@@ -24,15 +23,14 @@ export const Scene: React.FC = () => {
       className="w-full h-full bg-[#000205]"
       onPointerDown={handlePointerDown}
       gl={{ 
-        antialias: !isMobile, // 手机关抗锯齿，PC 开
+        antialias: !isMobile, 
         toneMapping: THREE.ACESFilmicToneMapping,
         outputColorSpace: THREE.SRGBColorSpace,
-        powerPreference: isMobile ? "low-power" : "default",
+        powerPreference: "low-power", // 保持低功耗
         preserveDrawingBuffer: true
       }}
       dpr={isMobile ? [1, 1.5] : [1, 2]} 
     >
-      {/* 手机端相机保持拉远，确保能看全 */}
       <PerspectiveCamera makeDefault position={[0, 1.5, isMobile ? 24 : 14]} fov={35} />
       
       <OrbitControls 
@@ -44,20 +42,20 @@ export const Scene: React.FC = () => {
       />
       
       <Suspense fallback={null}>
-        <ambientLight intensity={0.1} />
+        <ambientLight intensity={0.5} />
         <pointLight position={[0, 0, 0]} color="#0055ff" intensity={5} distance={15} />
         <spotLight position={[0, 20, 0]} angle={0.15} penumbra={1} intensity={8} color="#ffffff" />
         
         <ChristmasTree />
         
-        {/* PC 端才开启的高级阴影 */}
         {!isMobile && (
            <ContactShadows opacity={0.4} scale={25} blur={3} far={10} resolution={512} color="#000000" />
         )}
 
-        <Environment preset="night" />
+        {/* 手机端彻底移除环境贴图加载，减少网络请求 */}
+        {!isMobile && <Environment preset="night" />}
         
-        {/* PC 端才开启的后期特效，手机端只开泛光 */}
+        {/* 手机端只保留最简单的泛光 */}
         {!isMobile ? (
           <EffectComposer enableNormalPass={false} multisampling={4}>
             <Bloom luminanceThreshold={0.1} mipmapBlur intensity={2.5} radius={0.4} />
@@ -66,7 +64,6 @@ export const Scene: React.FC = () => {
             <Vignette eskil={false} offset={0.1} darkness={1.2} />
           </EffectComposer>
         ) : (
-          // 手机端只保留最基础的泛光，增加氛围感但不卡顿
           <EffectComposer enableNormalPass={false} multisampling={0}>
              <Bloom luminanceThreshold={0.2} mipmapBlur intensity={1.5} radius={0.4} />
           </EffectComposer>
