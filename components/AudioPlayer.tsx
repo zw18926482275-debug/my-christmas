@@ -1,25 +1,25 @@
 import React, { useEffect, useRef } from 'react';
-import { useAppState } from './Store'; // 注意：这里通常不需要加 .tsx 后缀
+import { useAppState } from './Store';
 
-// 🟢 自动获取 Vite 配置里的 base 路径 (就是 /my-christmas/)
-const BASE_URL = import.meta.env.BASE_URL;
-
+// 🔴 简单粗暴：直接写死 GitHub 的完整路径
+// 这样绝对不会因为“路径对不上”而死循环
 const REAL_SONG_LINKS = {
-  // 🟢 自动拼接路径，不管在哪都不会错
-  'all-i-want': `${BASE_URL}all_i_want.mp3`, 
-  'santa-tell-me': `${BASE_URL}santa.mp3`
+  'all-i-want': '/my-christmas/all_i_want.mp3', 
+  'santa-tell-me': '/my-christmas/santa.mp3'
 };
 
 export const AudioPlayer: React.FC = () => {
   const { currentSong, isPlaying, isMuted } = useAppState();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // 1. 处理静音
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : 0.7;
     }
   }, [isMuted]);
 
+  // 2. 处理播放逻辑
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -27,27 +27,26 @@ export const AudioPlayer: React.FC = () => {
     if (isPlaying && currentSong) {
       const targetSrc = REAL_SONG_LINKS[currentSong];
       
-      // 🟢 修复判断逻辑：使用 includes 防止绝对路径和相对路径不一致导致的死循环
-      // 如果当前播放的地址不包含目标地址，才重新加载
-      if (!audio.src.includes(targetSrc)) {
+      // 🟢 关键修复：只有当链接真的不一样时，才重新加载
+      // 使用 .endsWith() 来避免“相对路径”vs“绝对路径”造成的死循环
+      if (!audio.src.endsWith(targetSrc)) {
+        console.log("切换歌曲:", targetSrc);
         audio.src = targetSrc;
         audio.load();
-        
-        // 尝试播放，处理浏览器的自动播放限制
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.log("等待用户交互才能播放:", error);
-          });
-        }
-      } else {
-        // 如果地址一样，只需要确保它是播放状态
-        audio.play().catch(() => {});
+      }
+      
+      // 尝试播放
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          // 这里的报错通常是因为用户还没点击屏幕，属于正常现象
+          console.log("等待交互:", error);
+        });
       }
     } else {
       audio.pause();
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, currentSong]); // 监听这些变化
 
   return (
     <audio 
@@ -59,4 +58,3 @@ export const AudioPlayer: React.FC = () => {
     />
   );
 };
-
