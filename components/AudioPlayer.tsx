@@ -3,8 +3,9 @@ import React, { useEffect, useRef } from 'react';
 import { useAppState } from './Store.tsx';
 
 const REAL_SONG_LINKS = {
-  'all-i-want': 'https://raw.githubusercontent.com/zw18926482275-debug/my-christmas-music/main/all_i_want.mp3',
-  'santa-tell-me': 'https://raw.githubusercontent.com/zw18926482275-debug/my-christmas-music/main/santa.mp3'
+  // 🔴 去掉开头的 /
+  'all-i-want': 'all_i_want.mp3', 
+  'santa-tell-me': 'santa.mp3'
 };
 
 export const AudioPlayer: React.FC = () => {
