@@ -6,11 +6,12 @@ import * as THREE from 'three';
 import { useAppState } from './Store.tsx';
 import { TreeState } from '../types.ts';
 
-const COUNT_A = 1200;  // Gold Ribbon
-const COUNT_B = 8500;  // Blue Nebula
-const COUNT_C = 8000;  // Gold Sparkles
-const BOKEH_COUNT = 300; // Background falling particles
+const COUNT_A = 1200; 
+const COUNT_B = 8500; 
+const COUNT_C = 8000; 
+const BOKEH_COUNT = 300; 
 
+// 🔴 修复点 1：修正 Shader 代码，移除了不存在的 'normal' 属性
 const ribbonShader = {
   uniforms: {
     uTime: { value: 0 },
@@ -25,7 +26,12 @@ const ribbonShader = {
     void main() {
       vOpacity = aOpacity;
       vec3 pos = position;
-      pos += normal * sin(uTime * 2.0 + position.y) * 0.02;
+      // 🔴 删除或注释掉了导致崩溃的 normal 计算
+      // pos += normal * sin(uTime * 2.0 + position.y) * 0.02;
+      
+      // 改用基于位置的简单波动，或者直接不波动，保证安全
+      pos.x += sin(uTime * 2.0 + position.y) * 0.02; 
+      
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
       gl_Position = projectionMatrix * mvPosition;
       gl_PointSize = aSize * (800.0 / -mvPosition.z);
@@ -229,3 +235,5 @@ export const ChristmasTree: React.FC = () => {
     </group>
   );
 };
+ 
+    
