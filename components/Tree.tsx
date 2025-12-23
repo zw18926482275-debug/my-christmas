@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Sparkles, Stars, Float } from '@react-three/drei';
@@ -8,13 +7,13 @@ import { TreeState } from '../types';
 
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-// 🟢 恢复画质配置：手机端数量适中，PC端火力全开
-const COUNT_A = isMobile ? 800 : 1200;  // 金色丝带
-const COUNT_B = isMobile ? 2000 : 8500; // 蓝色星云
-const COUNT_C = isMobile ? 2000 : 8000; // 金色闪光
-const BOKEH_COUNT = isMobile ? 100 : 300; 
+// 🟢 平衡配置：手机端控制在 1500 个粒子左右，保证绝对流畅
+const COUNT_A = isMobile ? 300 : 1200;  // 丝带
+const COUNT_B = isMobile ? 800 : 8500;  // 星云
+const COUNT_C = isMobile ? 600 : 8000;  // 闪光
+const BOKEH_COUNT = isMobile ? 50 : 300; 
 
-// PC端使用的高级 Shader (手机端自动降级为 PointsMaterial)
+// PC端 Shader (手机端自动忽略)
 const ribbonShader = {
   uniforms: {
     uTime: { value: 0 },
@@ -29,7 +28,6 @@ const ribbonShader = {
     void main() {
       vOpacity = aOpacity;
       vec3 pos = position;
-      // 简单波动
       pos.x += sin(uTime * 2.0 + position.y) * 0.05; 
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
       gl_Position = projectionMatrix * mvPosition;
@@ -89,7 +87,6 @@ export const ChristmasTree: React.FC = () => {
       const baseR = (1 - yNormalized) * 2.2;
       
       let x = 0, y = h, z = 0;
-      // 恢复原本复杂的螺旋数学计算，保证树形美观
       if (type === 'A') {
         const ribbonWidth = 0.08 * (1 - yNormalized);
         const r = baseR + (Math.random() - 0.5) * ribbonWidth * 12.0;
@@ -186,28 +183,27 @@ export const ChristmasTree: React.FC = () => {
 
   return (
     <group>
-      {/* 氛围粒子 */}
+      {/* 1. 背景粒子 */}
       <points ref={bokehRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={BOKEH_COUNT} array={bokehData.pos} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial color="#ffd700" size={isMobile ? 0.8 : 0.4} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
+        {/* 粒子变大：0.8 -> 1.0 */}
+        <pointsMaterial color="#ffd700" size={isMobile ? 1.0 : 0.4} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
-      {/* 金色丝带 (核心树形) */}
+      {/* 2. 金色丝带 */}
       <points ref={ribbonRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_A} array={systemA.currPos} itemSize={3} />
-          {/* PC端需要这些属性，手机端忽略 */}
           {!isMobile && <bufferAttribute attach="attributes-aSize" count={COUNT_A} array={systemA.sizes} itemSize={1} />}
           {!isMobile && <bufferAttribute attach="attributes-aOpacity" count={COUNT_A} array={systemA.opacities} itemSize={1} />}
         </bufferGeometry>
         
-        {/* 核心降级逻辑：手机用 PointsMaterial，PC 用 Shader */}
         {isMobile ? (
           <pointsMaterial 
             color="#FFD700" 
-            size={0.25} 
+            size={0.4} // 粒子变大！
             transparent 
             opacity={0.8} 
             blending={THREE.AdditiveBlending} 
@@ -219,42 +215,49 @@ export const ChristmasTree: React.FC = () => {
         )}
       </points>
 
-      {/* 蓝色星云 */}
+      {/* 3. 蓝色星云 */}
       <points ref={nebulaRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_B} array={systemB.currPos} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial color="#0077BE" size={isMobile ? 0.22 : 0.11} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
+        {/* 粒子变大：0.22 -> 0.3 */}
+        <pointsMaterial color="#0077BE" size={isMobile ? 0.3 : 0.11} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
-      {/* 金色闪烁 */}
+      {/* 4. 金色闪光 */}
       <points ref={sparkleRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_C} array={systemC.currPos} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial color="#FFD700" size={isMobile ? 0.12 : 0.05} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
+        {/* 粒子变大：0.12 -> 0.2 */}
+        <pointsMaterial color="#FFD700" size={isMobile ? 0.2 : 0.05} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
-      {/* 顶部星星 */}
+      {/* 5. 顶部星星 - 核心修复 */}
       <Float speed={2.5} rotationIntensity={0.2} floatIntensity={0.3}>
         <group ref={starRef} position={[0, 4.25, 0]}>
           <mesh rotation={[0, 0, 0]} position={[0, 0, -0.06]}>
             <extrudeGeometry args={[starShape, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 5 }]} />
-            <meshStandardMaterial 
-              color="#FFD700" 
-              emissive="#FFD700" 
-              emissiveIntensity={isExploded && isCinematic ? 100 : 30} 
-              toneMapped={false} 
-              metalness={0.9} 
-              roughness={0.1} 
-            />
+            {/* 🔴 关键修复：手机端使用 MeshBasicMaterial（自带发光），防止因为灯光计算失败而变黑 */}
+            {isMobile ? (
+               <meshBasicMaterial color="#FFD700" /> 
+            ) : (
+               <meshStandardMaterial 
+                color="#FFD700" 
+                emissive="#FFD700" 
+                emissiveIntensity={30} 
+                toneMapped={false} 
+                metalness={0.9} 
+                roughness={0.1} 
+              />
+            )}
           </mesh>
-          <pointLight intensity={isExploded && isCinematic ? 1000 : 250} distance={20} color="#FFD700" />
+          <pointLight intensity={isMobile ? 100 : 250} distance={20} color="#FFD700" />
         </group>
       </Float>
 
-      <Sparkles count={isMobile ? 400 : 1200} scale={20} size={4} speed={0.5} color="#ffd700" opacity={0.2} />
-      <Stars radius={150} depth={50} count={isMobile ? 3000 : 10000} factor={6} saturation={0} fade speed={1} />
+      <Sparkles count={isMobile ? 200 : 1200} scale={20} size={isMobile ? 6 : 4} speed={0.5} color="#ffd700" opacity={0.2} />
+      <Stars radius={150} depth={50} count={isMobile ? 1000 : 10000} factor={6} saturation={0} fade speed={1} />
     </group>
   );
 };
