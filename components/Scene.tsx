@@ -8,6 +8,9 @@ import * as THREE from 'three';
 import { useAppState } from './Store.tsx';
 import { TreeState } from '../types.ts';
 
+// 1. 在文件头部添加一个简单的手机判断
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
 export const Scene: React.FC = () => {
   const { state, isExploded, setIsExploded } = useAppState();
 
@@ -24,12 +27,14 @@ export const Scene: React.FC = () => {
       className="w-full h-full bg-[#000205]"
       onPointerDown={handlePointerDown}
       gl={{ 
-        antialias: true,
+        // 手机端建议关掉默认抗锯齿以节省性能，PC端保持开启
+        antialias: !isMobile,
         toneMapping: THREE.ACESFilmicToneMapping,
         outputColorSpace: THREE.SRGBColorSpace,
         powerPreference: "high-performance"
       }}
-      dpr={[1, 2]} // 优化高分屏显示
+      // 🟢 优化 1: 手机端限制像素比，防止高分屏手机渲染压力过大
+      dpr={isMobile ? [1, 1.5] : [1, 2]} 
     >
       <PerspectiveCamera makeDefault position={[0, 1.5, 14]} fov={35} />
       <OrbitControls 
@@ -56,19 +61,22 @@ export const Scene: React.FC = () => {
         
         <ChristmasTree />
         
-        <ContactShadows 
-          opacity={0.4} 
-          scale={25} 
-          blur={3} 
-          far={10} 
-          resolution={1024} 
-          color="#000000" 
-        />
+        {/* 🟢 优化 2: 手机端直接移除 ContactShadows (非常耗性能) */}
+        {!isMobile && (
+          <ContactShadows 
+            opacity={0.4} 
+            scale={25} 
+            blur={3} 
+            far={10} 
+            resolution={512} // 将原来的 1024 降低为 512
+            color="#000000" 
+          />
+        )}
         
         <Environment preset="night" />
         
-        {/* Fix: changed disableNormalPass to enableNormalPass={false} to resolve type error on EffectComposer */}
-        <EffectComposer enableNormalPass={false} multisampling={4}>
+        {/* 🟢 优化 3: 手机端降低采样率 (multisampling 设为 0) */}
+        <EffectComposer enableNormalPass={false} multisampling={isMobile ? 0 : 4}>
           <Bloom 
             luminanceThreshold={0.1} 
             mipmapBlur 
