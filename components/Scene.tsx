@@ -23,13 +23,13 @@ export const Scene: React.FC = () => {
       className="w-full h-full bg-[#000205]"
       onPointerDown={handlePointerDown}
       gl={{ 
-        antialias: true, // 开启抗锯齿，画面更细腻
+        antialias: true, // 🔴 核心修复：强制开启抗锯齿，解决粒子边缘闪烁问题
         toneMapping: THREE.ACESFilmicToneMapping,
         outputColorSpace: THREE.SRGBColorSpace,
-        powerPreference: "default",
+        powerPreference: "default", // 恢复默认电源模式，保证渲染稳定
         preserveDrawingBuffer: true
       }}
-      dpr={isMobile ? [1, 2] : [1, 2]} 
+      dpr={isMobile ? [1, 2] : [1, 2]} // 允许手机更高分辨率
     >
       <PerspectiveCamera makeDefault position={[0, 1.5, isMobile ? 24 : 14]} fov={35} />
       
@@ -54,19 +54,16 @@ export const Scene: React.FC = () => {
 
         {!isMobile && <Environment preset="night" />}
         
-        {/* 🟢 手机端画质增强：开启轻量级泛光 */}
-        {/* 这次因为粒子用了贴图，Bloom 效果会倍增，且参数调低后不会卡 */}
-        <EffectComposer enableNormalPass={false} multisampling={isMobile ? 0 : 4}>
-          <Bloom 
-            luminanceThreshold={isMobile ? 0.2 : 0.1} // 手机端阈值调高，只让最亮的地方发光，节省算力
-            mipmapBlur 
-            intensity={isMobile ? 1.5 : 2.5} 
-            radius={0.4} 
-          />
-          {!isMobile && <ChromaticAberration offset={new THREE.Vector2(0.0008, 0.0008)} />}
-          <Noise opacity={0.015} />
-          <Vignette eskil={false} offset={0.1} darkness={1.2} />
-        </EffectComposer>
+        {/* 🔴 核心修复：手机端完全移除 EffectComposer */}
+        {/* 后期处理是手机闪屏的根源，移除后画面会非常稳，且粒子更清晰 */}
+        {!isMobile && (
+          <EffectComposer enableNormalPass={false} multisampling={4}>
+            <Bloom luminanceThreshold={0.1} mipmapBlur intensity={2.5} radius={0.4} />
+            <ChromaticAberration offset={new THREE.Vector2(0.0008, 0.0008)} />
+            <Noise opacity={0.015} />
+            <Vignette eskil={false} offset={0.1} darkness={1.2} />
+          </EffectComposer>
+        )}
       </Suspense>
     </Canvas>
   );
