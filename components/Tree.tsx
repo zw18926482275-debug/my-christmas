@@ -1,17 +1,16 @@
-
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Sparkles, Stars, Float } from '@react-three/drei';
 import * as THREE from 'three';
-import { useAppState } from './Store.tsx';
-import { TreeState } from '../types.ts';
+import { useAppState } from './Store'; // 确保路径没有 .tsx
+import { TreeState } from '../types';
 
-const COUNT_A = 1200; 
-const COUNT_B = 8500; 
-const COUNT_C = 8000; 
-const BOKEH_COUNT = 300; 
+const COUNT_A = 1200;
+const COUNT_B = 8500;
+const COUNT_C = 8000;
+const BOKEH_COUNT = 300;
 
-// 🔴 修复点 1：修正 Shader 代码，移除了不存在的 'normal' 属性
+// 🔴 修复点：移除了导致手机黑屏的 'normal' 引用
 const ribbonShader = {
   uniforms: {
     uTime: { value: 0 },
@@ -26,11 +25,11 @@ const ribbonShader = {
     void main() {
       vOpacity = aOpacity;
       vec3 pos = position;
-      // 🔴 删除或注释掉了导致崩溃的 normal 计算
-      // pos += normal * sin(uTime * 2.0 + position.y) * 0.02;
       
-      // 改用基于位置的简单波动，或者直接不波动，保证安全
-      pos.x += sin(uTime * 2.0 + position.y) * 0.02; 
+      // 🔴 之前这里用了 normal，导致手机显卡崩溃
+      // 改用基于位置的简单波动
+      pos.x += sin(uTime * 2.0 + position.y) * 0.05; 
+      pos.z += cos(uTime * 2.0 + position.y) * 0.05;
       
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
       gl_Position = projectionMatrix * mvPosition;
@@ -235,5 +234,3 @@ export const ChristmasTree: React.FC = () => {
     </group>
   );
 };
- 
-    
