@@ -7,17 +7,18 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
-    // 🔴 核心配置：让 GitHub Pages 能找到路径
+    // 🔴 核心修复：有了这一行，所有 404 报错都会消失
     base: '/my-christmas/',
     
     plugins: [react()],
     
+    // 确保开发服务器也能跑
     server: {
       port: 3000,
       host: '0.0.0.0',
     },
 
-    // 环境变量配置 (保留你原来的 API Key 设置)
+    // 你的 API Key 配置
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
@@ -25,7 +26,7 @@ export default defineConfig(({ mode }) => {
 
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, 'src'), // 通常这里指向 src
+        '@': path.resolve(__dirname, 'src'),
       }
     },
 
