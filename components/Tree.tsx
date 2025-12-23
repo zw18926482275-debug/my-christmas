@@ -1,16 +1,52 @@
 
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Float } from '@react-three/drei';
+import { Sparkles, Stars, Float } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppState } from './Store';
 import { TreeState } from '../types';
 
-// 🔴 极简模式：只生成 50 个粒子，排除性能问题
-const COUNT_A = 50;  
-const COUNT_B = 50;  
-const COUNT_C = 50;  
-const BOKEH_COUNT = 20; 
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+// 🟢 恢复画质配置：手机端数量适中，PC端火力全开
+const COUNT_A = isMobile ? 800 : 1200;  // 金色丝带
+const COUNT_B = isMobile ? 2000 : 8500; // 蓝色星云
+const COUNT_C = isMobile ? 2000 : 8000; // 金色闪光
+const BOKEH_COUNT = isMobile ? 100 : 300; 
+
+// PC端使用的高级 Shader (手机端自动降级为 PointsMaterial)
+const ribbonShader = {
+  uniforms: {
+    uTime: { value: 0 },
+    uColor: { value: new THREE.Color("#FFD700") },
+    uOpacity: { value: 0.8 }
+  },
+  vertexShader: `
+    uniform float uTime;
+    attribute float aSize;
+    attribute float aOpacity;
+    varying float vOpacity;
+    void main() {
+      vOpacity = aOpacity;
+      vec3 pos = position;
+      // 简单波动
+      pos.x += sin(uTime * 2.0 + position.y) * 0.05; 
+      vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+      gl_Position = projectionMatrix * mvPosition;
+      gl_PointSize = aSize * (800.0 / -mvPosition.z);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 uColor;
+    varying float vOpacity;
+    void main() {
+      float dist = length(gl_PointCoord - vec2(0.5));
+      if (dist > 0.5) discard;
+      float strength = 1.0 - dist * 2.0;
+      gl_FragColor = vec4(uColor, strength * vOpacity);
+    }
+  `
+};
 
 export const ChristmasTree: React.FC = () => {
   const { state, isExploded } = useAppState();
@@ -22,7 +58,6 @@ export const ChristmasTree: React.FC = () => {
 
   const isCinematic = state === TreeState.SCATTERED;
 
-  // 星星形状
   const starShape = useMemo(() => {
     const shape = new THREE.Shape();
     const points = 5;
@@ -37,11 +72,12 @@ export const ChristmasTree: React.FC = () => {
     return shape;
   }, []);
 
-  // 生成极少量数据
   const createSystemData = (count: number, type: 'A' | 'B' | 'C') => {
+    const targetPos = new Float32Array(count * 3);
+    const randomPos = new Float32Array(count * 3);
     const currPos = new Float32Array(count * 3);
-    const targetPos = new Float32Array(count * 3); // 需要保留 targetPos 避免 updatePhysics 报错
-    const randomPos = new Float32Array(count * 3); // 需要保留 randomPos
+    const sizes = new Float32Array(count);
+    const opacities = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
@@ -52,16 +88,38 @@ export const ChristmasTree: React.FC = () => {
       const theta = yNormalized * Math.PI * 2 * spirals;
       const baseR = (1 - yNormalized) * 2.2;
       
-      let x = Math.cos(theta) * baseR;
-      let y = h;
-      let z = Math.sin(theta) * baseR;
+      let x = 0, y = h, z = 0;
+      // 恢复原本复杂的螺旋数学计算，保证树形美观
+      if (type === 'A') {
+        const ribbonWidth = 0.08 * (1 - yNormalized);
+        const r = baseR + (Math.random() - 0.5) * ribbonWidth * 12.0;
+        x = Math.cos(theta) * r;
+        z = Math.sin(theta) * r;
+        sizes[i] = 0.06 + Math.random() * 0.1;
+        opacities[i] = 0.5 + Math.random() * 0.4;
+      } else if (type === 'B') {
+        const r = Math.sqrt(Math.random()) * baseR * 1.25; 
+        const randAngle = Math.random() * Math.PI * 2;
+        x = Math.cos(randAngle) * r;
+        z = Math.sin(randAngle) * r;
+        sizes[i] = 0.07 + Math.random() * 0.15;
+        opacities[i] = 0.2 + Math.random() * 0.3;
+      } else {
+        const r = baseR * Math.sqrt(Math.random()) * 1.4;
+        const randAngle = Math.random() * Math.PI * 2;
+        x = Math.cos(randAngle) * r;
+        z = Math.sin(randAngle) * r;
+        sizes[i] = 0.02 + Math.random() * 0.06;
+        opacities[i] = 0.6 + Math.random() * 0.4;
+      }
 
-      // 简单赋值
-      currPos[i3] = x; currPos[i3 + 1] = y; currPos[i3 + 2] = z;
       targetPos[i3] = x; targetPos[i3 + 1] = y; targetPos[i3 + 2] = z;
-      randomPos[i3] = x * 2; randomPos[i3 + 1] = y * 2; randomPos[i3 + 2] = z * 2;
+      randomPos[i3] = (Math.random() - 0.5) * 15;
+      randomPos[i3 + 1] = (Math.random() - 0.5) * 15;
+      randomPos[i3 + 2] = (Math.random() - 0.5) * 15;
+      currPos[i3] = x; currPos[i3 + 1] = y; currPos[i3 + 2] = z;
     }
-    return { currPos, targetPos, randomPos };
+    return { targetPos, randomPos, currPos, sizes, opacities };
   };
 
   const systemA = useMemo(() => createSystemData(COUNT_A, 'A'), []);
@@ -72,69 +130,131 @@ export const ChristmasTree: React.FC = () => {
     const pos = new Float32Array(BOKEH_COUNT * 3);
     const vel = new Float32Array(BOKEH_COUNT * 3);
     for(let i=0; i<BOKEH_COUNT; i++) {
-       pos[i*3] = (Math.random() - 0.5) * 10;
-       pos[i*3+1] = (Math.random() - 0.5) * 10;
-       pos[i*3+2] = (Math.random() - 0.5) * 10;
-       vel[i*3+1] = -0.05;
+      pos[i*3] = (Math.random() - 0.5) * 40;
+      pos[i*3+1] = Math.random() * 40;
+      pos[i*3+2] = (Math.random() - 0.5) * 40;
+      vel[i*3+1] = -(0.02 + Math.random() * 0.05);
     }
     return { pos, vel };
   }, []);
 
-  // 极简动画逻辑
+  const updatePhysics = (sys: any, ref: any) => {
+    const activeExplosion = isCinematic && isExploded;
+    const lerpFactor = activeExplosion ? 0.03 : 0.08;
+
+    for (let i = 0; i < sys.targetPos.length / 3; i++) {
+      const i3 = i * 3;
+      const tx = activeExplosion ? sys.randomPos[i3] : sys.targetPos[i3];
+      const ty = activeExplosion ? sys.randomPos[i3+1] : sys.targetPos[i3+1];
+      const tz = activeExplosion ? sys.randomPos[i3+2] : sys.targetPos[i3+2];
+
+      sys.currPos[i3] = THREE.MathUtils.lerp(sys.currPos[i3], tx, lerpFactor);
+      sys.currPos[i3+1] = THREE.MathUtils.lerp(sys.currPos[i3+1], ty, lerpFactor);
+      sys.currPos[i3+2] = THREE.MathUtils.lerp(sys.currPos[i3+2], tz, lerpFactor);
+    }
+    if (ref.current) {
+      ref.current.geometry.attributes.position.needsUpdate = true;
+    }
+  };
+
   useFrame((stateContext) => {
     const time = stateContext.clock.getElapsedTime();
-    if (starRef.current) {
-       starRef.current.rotation.y += 0.01;
+    updatePhysics(systemA, ribbonRef);
+    updatePhysics(systemB, nebulaRef);
+    updatePhysics(systemC, sparkleRef);
+
+    if (bokehRef.current) {
+      const positions = bokehRef.current.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < BOKEH_COUNT; i++) {
+        const i3 = i * 3;
+        positions[i3+1] += bokehData.vel[i3+1];
+        if (positions[i3+1] < -10) positions[i3+1] = 30;
+      }
+      bokehRef.current.geometry.attributes.position.needsUpdate = true;
     }
-    // 简单的粒子移动，不进行复杂的 Lerp 计算，防止性能问题
-    if(ribbonRef.current) ribbonRef.current.rotation.y += 0.005;
-    if(nebulaRef.current) nebulaRef.current.rotation.y -= 0.005;
+
+    if (!isMobile && ribbonRef.current && (ribbonRef.current.material as THREE.ShaderMaterial).uniforms) {
+       (ribbonRef.current.material as THREE.ShaderMaterial).uniforms.uTime.value = time;
+    }
+
+    if (starRef.current) {
+      const rotationSpeed = isExploded && isCinematic ? 3.0 : 0.8;
+      starRef.current.rotation.y += (rotationSpeed * 0.016);
+      starRef.current.scale.setScalar(1 + Math.sin(time * 2) * 0.03);
+    }
   });
 
   return (
     <group>
-      {/* 背景粒子 */}
+      {/* 氛围粒子 */}
       <points ref={bokehRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={BOKEH_COUNT} array={bokehData.pos} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial color="white" size={0.5} transparent opacity={0.5} />
+        <pointsMaterial color="#ffd700" size={isMobile ? 0.8 : 0.4} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
-      {/* 粒子 A */}
+      {/* 金色丝带 (核心树形) */}
       <points ref={ribbonRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_A} array={systemA.currPos} itemSize={3} />
+          {/* PC端需要这些属性，手机端忽略 */}
+          {!isMobile && <bufferAttribute attach="attributes-aSize" count={COUNT_A} array={systemA.sizes} itemSize={1} />}
+          {!isMobile && <bufferAttribute attach="attributes-aOpacity" count={COUNT_A} array={systemA.opacities} itemSize={1} />}
         </bufferGeometry>
-        {/* 🔴 必须使用 PointsMaterial，最安全的材质 */}
-        <pointsMaterial color="#FFD700" size={0.5} sizeAttenuation={true} transparent opacity={1} />
+        
+        {/* 核心降级逻辑：手机用 PointsMaterial，PC 用 Shader */}
+        {isMobile ? (
+          <pointsMaterial 
+            color="#FFD700" 
+            size={0.25} 
+            transparent 
+            opacity={0.8} 
+            blending={THREE.AdditiveBlending} 
+            depthWrite={false} 
+            sizeAttenuation={true}
+          />
+        ) : (
+          <shaderMaterial {...ribbonShader} transparent blending={THREE.AdditiveBlending} depthWrite={false} />
+        )}
       </points>
 
-      {/* 粒子 B */}
+      {/* 蓝色星云 */}
       <points ref={nebulaRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_B} array={systemB.currPos} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial color="#0077BE" size={0.5} transparent opacity={0.8} />
+        <pointsMaterial color="#0077BE" size={isMobile ? 0.22 : 0.11} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
-      {/* 粒子 C */}
+      {/* 金色闪烁 */}
       <points ref={sparkleRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_C} array={systemC.currPos} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial color="red" size={0.5} transparent opacity={0.8} />
+        <pointsMaterial color="#FFD700" size={isMobile ? 0.12 : 0.05} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
       {/* 顶部星星 */}
-      <Float speed={2} rotationIntensity={0.2} floatIntensity={0.2}>
+      <Float speed={2.5} rotationIntensity={0.2} floatIntensity={0.3}>
         <group ref={starRef} position={[0, 4.25, 0]}>
           <mesh rotation={[0, 0, 0]} position={[0, 0, -0.06]}>
-             <extrudeGeometry args={[starShape, { depth: 0.12, bevelEnabled: false }]} />
-             <meshBasicMaterial color="yellow" />
+            <extrudeGeometry args={[starShape, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 5 }]} />
+            <meshStandardMaterial 
+              color="#FFD700" 
+              emissive="#FFD700" 
+              emissiveIntensity={isExploded && isCinematic ? 100 : 30} 
+              toneMapped={false} 
+              metalness={0.9} 
+              roughness={0.1} 
+            />
           </mesh>
+          <pointLight intensity={isExploded && isCinematic ? 1000 : 250} distance={20} color="#FFD700" />
         </group>
       </Float>
+
+      <Sparkles count={isMobile ? 400 : 1200} scale={20} size={4} speed={0.5} color="#ffd700" opacity={0.2} />
+      <Stars radius={150} depth={50} count={isMobile ? 3000 : 10000} factor={6} saturation={0} fade speed={1} />
     </group>
   );
 };
