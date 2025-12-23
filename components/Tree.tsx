@@ -5,46 +5,11 @@ import * as THREE from 'three';
 import { useAppState } from './Store';
 import { TreeState } from '../types';
 
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-// 🔴 核心修改：手机端粒子数量减半，防止内存崩溃
-const COUNT_A = isMobile ? 600 : 1200; 
-const COUNT_B = isMobile ? 3000 : 8500; 
-const COUNT_C = isMobile ? 3000 : 8000; 
-const BOKEH_COUNT = isMobile ? 100 : 300; 
-
-// PC端 Shader (手机不用)
-const ribbonShader = {
-  uniforms: {
-    uTime: { value: 0 },
-    uColor: { value: new THREE.Color("#FFD700") },
-    uOpacity: { value: 0.8 }
-  },
-  vertexShader: `
-    uniform float uTime;
-    attribute float aSize;
-    attribute float aOpacity;
-    varying float vOpacity;
-    void main() {
-      vOpacity = aOpacity;
-      vec3 pos = position;
-      pos.x += sin(uTime * 2.0 + position.y) * 0.05; 
-      vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-      gl_Position = projectionMatrix * mvPosition;
-      gl_PointSize = aSize * (800.0 / -mvPosition.z);
-    }
-  `,
-  fragmentShader: `
-    uniform vec3 uColor;
-    varying float vOpacity;
-    void main() {
-      float dist = length(gl_PointCoord - vec2(0.5));
-      if (dist > 0.5) discard;
-      float strength = 1.0 - dist * 2.0;
-      gl_FragColor = vec4(uColor, strength * vOpacity);
-    }
-  `
-};
+// 🔴 移除 isMobile 判断，所有设备统一使用安全配置
+const COUNT_A = 800;   // 降低数量，保证性能
+const COUNT_B = 3000;  
+const COUNT_C = 3000;  
+const BOKEH_COUNT = 150; 
 
 export const ChristmasTree: React.FC = () => {
   const { state, isExploded } = useAppState();
@@ -53,6 +18,8 @@ export const ChristmasTree: React.FC = () => {
   const sparkleRef = useRef<THREE.Points>(null!);
   const starRef = useRef<THREE.Group>(null!);
   const bokehRef = useRef<THREE.Points>(null!);
+  // 🔴 新增：红色测试盒子的引用
+  const debugBoxRef = useRef<THREE.Mesh>(null!);
 
   const isCinematic = state === TreeState.SCATTERED;
 
@@ -74,6 +41,8 @@ export const ChristmasTree: React.FC = () => {
     const targetPos = new Float32Array(count * 3);
     const randomPos = new Float32Array(count * 3);
     const currPos = new Float32Array(count * 3);
+    
+    // 即使不用 shader，我们也生成这些数据，防止 TS 报错或逻辑缺失
     const sizes = new Float32Array(count);
     const opacities = new Float32Array(count);
 
@@ -170,49 +139,50 @@ export const ChristmasTree: React.FC = () => {
       bokehRef.current.geometry.attributes.position.needsUpdate = true;
     }
 
-    if (!isMobile && ribbonRef.current && (ribbonRef.current.material as THREE.ShaderMaterial).uniforms) {
-       (ribbonRef.current.material as THREE.ShaderMaterial).uniforms.uTime.value = time;
-    }
-
     if (starRef.current) {
       const rotationSpeed = isExploded && isCinematic ? 3.0 : 0.8;
       starRef.current.rotation.y += (rotationSpeed * 0.016);
       starRef.current.scale.setScalar(1 + Math.sin(time * 2) * 0.03);
     }
+
+    // 让红色测试盒子也转动一下
+    if (debugBoxRef.current) {
+      debugBoxRef.current.rotation.x += 0.01;
+      debugBoxRef.current.rotation.y += 0.01;
+    }
   });
 
   return (
     <group>
+      {/* 🔴🔴🔴 红色测试盒子：如果你能看到这个，说明3D渲染是好的，只是粒子看不见 */}
+      <mesh ref={debugBoxRef} position={[0, 0, 0]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial color="red" wireframe={true} />
+      </mesh>
+
       <points ref={bokehRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={BOKEH_COUNT} array={bokehData.pos} itemSize={3} />
         </bufferGeometry>
-        {/* 手机端背景粒子调大 0.4 -> 0.8 */}
-        <pointsMaterial color="#ffd700" size={isMobile ? 0.8 : 0.4} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
+        {/* 增大粒子尺寸 0.8 */}
+        <pointsMaterial color="#ffd700" size={0.8} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
-      {/* Ribbon */}
+      {/* Ribbon - 强制使用 PointsMaterial，不使用 Shader */}
       <points ref={ribbonRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_A} array={systemA.currPos} itemSize={3} />
-          {!isMobile && <bufferAttribute attach="attributes-aSize" count={COUNT_A} array={systemA.sizes} itemSize={1} />}
-          {!isMobile && <bufferAttribute attach="attributes-aOpacity" count={COUNT_A} array={systemA.opacities} itemSize={1} />}
         </bufferGeometry>
         
-        {/* 🔴 手机端强制使用 PointsMaterial，不使用 Shader */}
-        {isMobile ? (
-          <pointsMaterial 
-            color="#FFD700" 
-            size={0.25} // 增大粒子确保可见
-            transparent 
-            opacity={0.8} 
-            blending={THREE.AdditiveBlending} 
-            depthWrite={false} 
-            sizeAttenuation={true}
-          />
-        ) : (
-          <shaderMaterial {...ribbonShader} transparent blending={THREE.AdditiveBlending} depthWrite={false} />
-        )}
+        <pointsMaterial 
+          color="#FFD700" 
+          size={0.35} // 再次增大尺寸，确保手机可见
+          transparent 
+          opacity={0.8} 
+          blending={THREE.AdditiveBlending} 
+          depthWrite={false} 
+          sizeAttenuation={true}
+        />
       </points>
 
       {/* Nebula */}
@@ -220,8 +190,7 @@ export const ChristmasTree: React.FC = () => {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_B} array={systemB.currPos} itemSize={3} />
         </bufferGeometry>
-        {/* 手机端粒子尺寸翻倍 */}
-        <pointsMaterial color="#0077BE" size={isMobile ? 0.22 : 0.11} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <pointsMaterial color="#0077BE" size={0.25} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
       {/* Sparkles */}
@@ -229,29 +198,22 @@ export const ChristmasTree: React.FC = () => {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_C} array={systemC.currPos} itemSize={3} />
         </bufferGeometry>
-        {/* 手机端粒子尺寸翻倍 */}
-        <pointsMaterial color="#FFD700" size={isMobile ? 0.12 : 0.05} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <pointsMaterial color="#FFD700" size={0.15} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
       <Float speed={2.5} rotationIntensity={0.2} floatIntensity={0.3}>
         <group ref={starRef} position={[0, 4.25, 0]}>
           <mesh rotation={[0, 0, 0]} position={[0, 0, -0.06]}>
             <extrudeGeometry args={[starShape, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 5 }]} />
-            <meshStandardMaterial 
-              color="#FFD700" 
-              emissive="#FFD700" 
-              emissiveIntensity={isExploded && isCinematic ? 100 : 30} 
-              toneMapped={false} 
-              metalness={0.9} 
-              roughness={0.1} 
-            />
+            {/* 🔴 使用 MeshBasicMaterial，不依赖灯光，确保一定能看见 */}
+            <meshBasicMaterial color="#FFD700" />
           </mesh>
-          <pointLight intensity={isExploded && isCinematic ? 1000 : 250} distance={20} color="#FFD700" />
+          <pointLight intensity={250} distance={20} color="#FFD700" />
         </group>
       </Float>
 
-      <Sparkles count={1200} scale={20} size={4} speed={0.5} color="#ffd700" opacity={0.2} />
-      <Stars radius={150} depth={50} count={isMobile ? 3000 : 10000} factor={6} saturation={0} fade speed={1} />
+      <Sparkles count={800} scale={20} size={6} speed={0.5} color="#ffd700" opacity={0.2} />
+      <Stars radius={150} depth={50} count={2000} factor={6} saturation={0} fade speed={1} />
     </group>
   );
 };
