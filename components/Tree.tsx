@@ -5,15 +5,15 @@ import * as THREE from 'three';
 import { useAppState } from './Store';
 import { TreeState } from '../types';
 
-// 1. 检测手机端
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-const COUNT_A = 1200;  // Gold Ribbon
-const COUNT_B = 8500;  // Blue Nebula
-const COUNT_C = 8000;  // Gold Sparkles
-const BOKEH_COUNT = 300; // Background falling particles
+// 🔴 核心修改：手机端粒子数量减半，防止内存崩溃
+const COUNT_A = isMobile ? 600 : 1200; 
+const COUNT_B = isMobile ? 3000 : 8500; 
+const COUNT_C = isMobile ? 3000 : 8000; 
+const BOKEH_COUNT = isMobile ? 100 : 300; 
 
-// PC端使用的自定义 Shader (手机端不使用这个，防止不显示)
+// PC端 Shader (手机不用)
 const ribbonShader = {
   uniforms: {
     uTime: { value: 0 },
@@ -28,7 +28,6 @@ const ribbonShader = {
     void main() {
       vOpacity = aOpacity;
       vec3 pos = position;
-      // 简单的正弦波动，避免使用 normal
       pos.x += sin(uTime * 2.0 + position.y) * 0.05; 
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
       gl_Position = projectionMatrix * mvPosition;
@@ -171,7 +170,6 @@ export const ChristmasTree: React.FC = () => {
       bokehRef.current.geometry.attributes.position.needsUpdate = true;
     }
 
-    // 更新 Shader 时间（仅在 PC 端需要，因为手机端我们不用 ShaderMaterial）
     if (!isMobile && ribbonRef.current && (ribbonRef.current.material as THREE.ShaderMaterial).uniforms) {
        (ribbonRef.current.material as THREE.ShaderMaterial).uniforms.uTime.value = time;
     }
@@ -189,24 +187,23 @@ export const ChristmasTree: React.FC = () => {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={BOKEH_COUNT} array={bokehData.pos} itemSize={3} />
         </bufferGeometry>
-        {/* 手机端粒子调大一点，确保能看见 */}
-        <pointsMaterial color="#ffd700" size={isMobile ? 0.6 : 0.4} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
+        {/* 手机端背景粒子调大 0.4 -> 0.8 */}
+        <pointsMaterial color="#ffd700" size={isMobile ? 0.8 : 0.4} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
-      {/* 核心修改：金色丝带系统 */}
+      {/* Ribbon */}
       <points ref={ribbonRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_A} array={systemA.currPos} itemSize={3} />
-          {/* PC端 Shader 需要这些属性，手机端 PointsMaterial 会自动忽略 */}
-          <bufferAttribute attach="attributes-aSize" count={COUNT_A} array={systemA.sizes} itemSize={1} />
-          <bufferAttribute attach="attributes-aOpacity" count={COUNT_A} array={systemA.opacities} itemSize={1} />
+          {!isMobile && <bufferAttribute attach="attributes-aSize" count={COUNT_A} array={systemA.sizes} itemSize={1} />}
+          {!isMobile && <bufferAttribute attach="attributes-aOpacity" count={COUNT_A} array={systemA.opacities} itemSize={1} />}
         </bufferGeometry>
         
-        {/* 🟢 关键修复：手机端降级使用标准 PointsMaterial，彻底解决 Shader 导致的黑屏 */}
+        {/* 🔴 手机端强制使用 PointsMaterial，不使用 Shader */}
         {isMobile ? (
           <pointsMaterial 
             color="#FFD700" 
-            size={0.15} // 手机端设置固定大小，确保可见
+            size={0.25} // 增大粒子确保可见
             transparent 
             opacity={0.8} 
             blending={THREE.AdditiveBlending} 
@@ -218,20 +215,22 @@ export const ChristmasTree: React.FC = () => {
         )}
       </points>
 
+      {/* Nebula */}
       <points ref={nebulaRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_B} array={systemB.currPos} itemSize={3} />
         </bufferGeometry>
-        {/* 手机端增大粒子尺寸 0.11 -> 0.18 */}
-        <pointsMaterial color="#0077BE" size={isMobile ? 0.18 : 0.11} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
+        {/* 手机端粒子尺寸翻倍 */}
+        <pointsMaterial color="#0077BE" size={isMobile ? 0.22 : 0.11} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
+      {/* Sparkles */}
       <points ref={sparkleRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_C} array={systemC.currPos} itemSize={3} />
         </bufferGeometry>
-        {/* 手机端增大粒子尺寸 0.05 -> 0.09 */}
-        <pointsMaterial color="#FFD700" size={isMobile ? 0.09 : 0.05} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
+        {/* 手机端粒子尺寸翻倍 */}
+        <pointsMaterial color="#FFD700" size={isMobile ? 0.12 : 0.05} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
       <Float speed={2.5} rotationIntensity={0.2} floatIntensity={0.3}>
@@ -252,7 +251,7 @@ export const ChristmasTree: React.FC = () => {
       </Float>
 
       <Sparkles count={1200} scale={20} size={4} speed={0.5} color="#ffd700" opacity={0.2} />
-      <Stars radius={150} depth={50} count={10000} factor={6} saturation={0} fade speed={1} />
+      <Stars radius={150} depth={50} count={isMobile ? 3000 : 10000} factor={6} saturation={0} fade speed={1} />
     </group>
   );
 };
