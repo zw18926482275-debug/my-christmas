@@ -80,11 +80,6 @@ export const UIOverlay: React.FC = () => {
   const isCinematic = state === TreeState.SCATTERED;
 
   return (
-    // 🔴 核心修复点在这里：
-    // px-6: 左右保持距离
-    // pt-14: 顶部大幅增加距离 (约 56px)，避开 iPhone 的刘海和灵动岛
-    // pb-8: 底部保持距离
-    // md:p-16: 电脑端保持原来的大间距
     <div className="fixed inset-0 pointer-events-none flex flex-col justify-between px-6 pt-14 pb-8 md:p-16 z-10 overflow-hidden">
       
       <div className="flex justify-between items-start pointer-events-auto">
@@ -92,7 +87,8 @@ export const UIOverlay: React.FC = () => {
           animate={{ opacity: isCinematic ? 0 : 1, x: isCinematic ? -50 : 0 }}
           className="flex flex-col"
         >
-          <h1 className="text-6xl md:text-8xl font-elegant text-[#FFCC00] font-bold tracking-normal leading-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
+          {/* 🟢 修复：调整标题字号，防止PC端过大 */}
+          <h1 className="text-6xl md:text-7xl font-elegant text-[#FFCC00] font-bold tracking-normal leading-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
             Merry<br/>Christmas
           </h1>
           <div className="w-32 h-[4px] bg-[#FFCC00] mt-2 shadow-[0_0_15px_rgba(255,204,0,0.6)]" />
@@ -119,7 +115,7 @@ export const UIOverlay: React.FC = () => {
             >
               {isPlaying ? (
                 <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 4, ease: "linear" }}>
-                   <Music size={18} className="text-[#ffd700]" />
+                    <Music size={18} className="text-[#ffd700]" />
                 </motion.div>
               ) : (
                 <VolumeX size={18} />
@@ -132,7 +128,6 @@ export const UIOverlay: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.9, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                  // 这里的 right-0 确保菜单向左展开，不会溢出屏幕
                   className="absolute right-0 mt-4 w-64 md:w-72 bg-black/95 backdrop-blur-3xl border border-[#ffd700]/30 rounded-[2rem] p-6 shadow-[0_30px_100px_rgba(0,0,0,0.9)] z-50 overflow-hidden"
                 >
                   <div className="flex flex-col gap-4">
@@ -178,7 +173,6 @@ export const UIOverlay: React.FC = () => {
       </div>
 
       <div className="flex-1 flex items-center justify-center pointer-events-none">
-        {/* 中间的内容区域保持不变，但要确保 pointer-events 设置正确以免遮挡 Canvas */}
         <AnimatePresence mode="wait">
           {!isCinematic && (
             <motion.div 
@@ -228,14 +222,19 @@ export const UIOverlay: React.FC = () => {
                 <motion.div 
                   initial={{ opacity: 0, y: 50 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="w-full text-right pointer-events-auto self-end mb-10 md:mb-20 px-4"
+                  // 🟢 修复：PC端底部边距减小 (md:mb-12)，防止被顶出屏幕
+                  className="w-full text-right pointer-events-auto self-end mb-10 md:mb-12 px-4 flex justify-end"
                 >
-                   <div className="flex flex-col items-end gap-4 md:gap-6 bg-black/70 backdrop-blur-xl p-6 md:p-20 rounded-[2rem] md:rounded-[4rem] border border-white/20">
-                      <div className="flex items-center gap-4 md:gap-8">
-                        <span className="text-4xl md:text-9xl font-script text-[#ffd700]">To</span>
-                        <span className="text-3xl md:text-8xl font-artistic text-white">{userName}:</span>
+                    {/* 🟢 修复：内边距减小 (md:p-12)，最大宽度限制 (max-w-4xl) */}
+                    <div className="flex flex-col items-end gap-4 md:gap-6 bg-black/70 backdrop-blur-xl p-6 md:p-12 rounded-[2rem] md:rounded-[3rem] border border-white/20 max-w-4xl">
+                      <div className="flex items-center gap-4 md:gap-6">
+                        {/* 🟢 修复：字号从 9xl 减小到 7xl */}
+                        <span className="text-4xl md:text-7xl font-script text-[#ffd700]">To</span>
+                        {/* 🟢 修复：字号从 8xl 减小到 6xl */}
+                        <span className="text-3xl md:text-6xl font-artistic text-white">{userName}:</span>
                       </div>
-                      <p className="text-xl md:text-6xl font-artistic text-[#fefae0] leading-snug tracking-wider italic text-right">
+                      {/* 🟢 修复：核心修复！正文字号从 6xl 减小到 4xl，确保能完整显示 */}
+                      <p className="text-xl md:text-4xl font-artistic text-[#fefae0] leading-relaxed tracking-wider italic text-right">
                         {userBlessing}
                       </p>
                       <button 
@@ -244,7 +243,7 @@ export const UIOverlay: React.FC = () => {
                       >
                         <RefreshCcw size={16} /> 重新开启
                       </button>
-                   </div>
+                    </div>
                 </motion.div>
               )}
             </motion.div>
