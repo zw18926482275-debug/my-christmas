@@ -3,10 +3,12 @@ import React, { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei';
 import { Bloom, EffectComposer, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing';
-import { ChristmasTree } from './Tree.tsx';
 import * as THREE from 'three';
-import { useAppState } from './Store.tsx';
-import { TreeState } from '../types.ts';
+
+// 🔴 修复点 1：去掉文件后缀名 (.tsx / .ts)，否则 TS 会报错
+import { ChristmasTree } from './Tree';
+import { useAppState } from './Store';
+import { TreeState } from '../types';
 
 // 严格的手机检测
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -15,6 +17,7 @@ export const Scene: React.FC = () => {
   const { state, isExploded, setIsExploded } = useAppState();
 
   const handlePointerDown = () => {
+    // Only allow explosion interaction when in Cinematic Mode (SCATTERED state)
     if (state === TreeState.SCATTERED) {
       setIsExploded(!isExploded);
     }
@@ -31,6 +34,7 @@ export const Scene: React.FC = () => {
         outputColorSpace: THREE.SRGBColorSpace,
         powerPreference: "default" // 手机上不要强行 high-performance，容易掉驱动
       }}
+      // 🟢 优化: 手机端限制像素比
       dpr={isMobile ? [1, 1.5] : [1, 2]} 
     >
       <PerspectiveCamera makeDefault position={[0, 1.5, 14]} fov={35} />
@@ -72,8 +76,7 @@ export const Scene: React.FC = () => {
         
         <Environment preset="night" />
         
-        {/* 🔴 关键修改：手机端完全移除 EffectComposer，只保留原生渲染 */}
-        {/* 这样能排除一切后期 Shader 导致的黑屏风险 */}
+        {/* 🟢 关键修改：手机端完全移除 EffectComposer，只保留原生渲染 */}
         {!isMobile && (
           <EffectComposer enableNormalPass={false} multisampling={4}>
             <Bloom 
