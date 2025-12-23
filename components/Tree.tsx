@@ -5,16 +5,14 @@ import * as THREE from 'three';
 import { useAppState } from './Store';
 import { TreeState } from '../types';
 
-// 📱 检测手机端
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-// 🟢 暴力增加手机端的粒子数量和大小，确保能看见
-const COUNT_A = isMobile ? 2000 : 1500;   // 丝带粒子增多
-const COUNT_B = isMobile ? 5000 : 8500;   // 星云粒子增多
-const COUNT_C = isMobile ? 3000 : 8000;   // 闪光粒子增多
-const BOKEH_COUNT = isMobile ? 200 : 300; 
+// 🔴 优化配置：数量大幅增加，尺寸减小
+const COUNT_A = isMobile ? 600 : 1200;   // 丝带：变多
+const COUNT_B = isMobile ? 2500 : 8500;  // 星云：大幅变多
+const COUNT_C = isMobile ? 2000 : 8000;  // 闪光：大幅变多
+const BOKEH_COUNT = isMobile ? 150 : 300; 
 
-// PC端 Shader (保持不变)
 const ribbonShader = {
   uniforms: {
     uTime: { value: 0 },
@@ -55,26 +53,6 @@ export const ChristmasTree: React.FC = () => {
   const starRef = useRef<THREE.Group>(null!);
   const bokehRef = useRef<THREE.Points>(null!);
 
-  // 🟢 纹理生成：使用 useMemo 确保只生成一次
-  const glowTexture = useMemo(() => {
-    // 创建一个简单的发光圆点纹理
-    const canvas = document.createElement('canvas');
-    canvas.width = 32;
-    canvas.height = 32;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-        const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.4)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 32, 32);
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.magFilter = THREE.NearestFilter;
-    return texture;
-  }, []);
-
   const isCinematic = state === TreeState.SCATTERED;
 
   const starShape = useMemo(() => {
@@ -108,21 +86,21 @@ export const ChristmasTree: React.FC = () => {
       const baseR = (1 - yNormalized) * 2.2;
       
       let x = 0, y = h, z = 0;
-      if (type === 'A') { // 丝带
+      if (type === 'A') {
         const ribbonWidth = 0.08 * (1 - yNormalized);
         const r = baseR + (Math.random() - 0.5) * ribbonWidth * 12.0;
         x = Math.cos(theta) * r;
         z = Math.sin(theta) * r;
         sizes[i] = 0.06 + Math.random() * 0.1;
         opacities[i] = 0.5 + Math.random() * 0.4;
-      } else if (type === 'B') { // 星云
+      } else if (type === 'B') {
         const r = Math.sqrt(Math.random()) * baseR * 1.25; 
         const randAngle = Math.random() * Math.PI * 2;
         x = Math.cos(randAngle) * r;
         z = Math.sin(randAngle) * r;
         sizes[i] = 0.07 + Math.random() * 0.15;
         opacities[i] = 0.2 + Math.random() * 0.3;
-      } else { // 闪光
+      } else {
         const r = baseR * Math.sqrt(Math.random()) * 1.4;
         const randAngle = Math.random() * Math.PI * 2;
         x = Math.cos(randAngle) * r;
@@ -209,16 +187,8 @@ export const ChristmasTree: React.FC = () => {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={BOKEH_COUNT} array={bokehData.pos} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial 
-            color="#ffd700" 
-            map={glowTexture}
-            // 🟢 修改：增大背景粒子
-            size={isMobile ? 2.0 : 0.4} 
-            transparent 
-            opacity={0.3} 
-            blending={THREE.AdditiveBlending} 
-            depthWrite={false} 
-        />
+        {/* 调小背景粒子 */}
+        <pointsMaterial color="#ffd700" size={isMobile ? 0.6 : 0.4} transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
       {/* 2. 金色丝带 */}
@@ -232,11 +202,9 @@ export const ChristmasTree: React.FC = () => {
         {isMobile ? (
           <pointsMaterial 
             color="#FFD700" 
-            map={glowTexture}
-            // 🟢 修改：大幅增大手机端粒子尺寸！从0.5改到1.5
-            size={1.5} 
+            size={0.25} // 🔴 缩小尺寸：0.4 -> 0.25，更精致
             transparent 
-            opacity={1.0} // 🟢 修改：不透明度拉满
+            opacity={0.8} 
             blending={THREE.AdditiveBlending} 
             depthWrite={false} 
             sizeAttenuation={true}
@@ -251,16 +219,8 @@ export const ChristmasTree: React.FC = () => {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_B} array={systemB.currPos} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial 
-            color="#0077BE" 
-            map={glowTexture}
-            // 🟢 修改：增大星云粒子
-            size={isMobile ? 0.8 : 0.11} 
-            transparent 
-            opacity={0.8} 
-            blending={THREE.AdditiveBlending} 
-            depthWrite={false} 
-        />
+        {/* 🔴 缩小尺寸：0.3 -> 0.15 */}
+        <pointsMaterial color="#0077BE" size={isMobile ? 0.15 : 0.11} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
       {/* 4. 金色闪光 */}
@@ -268,16 +228,8 @@ export const ChristmasTree: React.FC = () => {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_C} array={systemC.currPos} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial 
-            color="#FFD700" 
-            map={glowTexture}
-            // 🟢 修改：增大闪光粒子
-            size={isMobile ? 0.6 : 0.05} 
-            transparent 
-            opacity={1.0} 
-            blending={THREE.AdditiveBlending} 
-            depthWrite={false} 
-        />
+        {/* 🔴 缩小尺寸：0.2 -> 0.12 */}
+        <pointsMaterial color="#FFD700" size={isMobile ? 0.12 : 0.05} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
       </points>
 
       {/* 5. 顶部星星 */}
@@ -302,8 +254,8 @@ export const ChristmasTree: React.FC = () => {
         </group>
       </Float>
 
-      <Sparkles count={isMobile ? 500 : 1200} scale={20} size={isMobile ? 15 : 4} speed={0.5} color="#ffd700" opacity={0.3} />
-      <Stars radius={150} depth={50} count={isMobile ? 1500 : 10000} factor={6} saturation={0} fade speed={1} />
+      <Sparkles count={isMobile ? 600 : 1200} scale={20} size={isMobile ? 5 : 4} speed={0.5} color="#ffd700" opacity={0.2} />
+      <Stars radius={150} depth={50} count={isMobile ? 2000 : 10000} factor={6} saturation={0} fade speed={1} />
     </group>
   );
 };
