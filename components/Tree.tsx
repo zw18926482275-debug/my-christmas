@@ -8,11 +8,10 @@ import { TreeState } from '../types';
 // 📱 检测手机端
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-// 🟢 数量调整：
-// 黄色(A/C)保持克制，蓝色(B)大幅增加，形成“蓝海托金山”的视觉差
-const COUNT_A = isMobile ? 800 : 1500;    // 丝带（金）
-const COUNT_B = isMobile ? 5000 : 8500;   // 星云（蓝）：从 2500 -> 5000 (翻倍！)
-const COUNT_C = isMobile ? 1500 : 8000;   // 闪光（金）：减少一点，避免抢了蓝色的戏
+// 数量与上一版保持一致
+const COUNT_A = isMobile ? 800 : 1500;    // 丝带(金)
+const COUNT_B = isMobile ? 5000 : 8500;   // 星云(蓝)
+const COUNT_C = isMobile ? 1500 : 8000;   // 闪光(金)
 const BOKEH_COUNT = isMobile ? 150 : 300; 
 
 // PC端 Shader (保持不变)
@@ -108,21 +107,21 @@ export const ChristmasTree: React.FC = () => {
       const baseR = (1 - yNormalized) * 2.2;
       
       let x = 0, y = h, z = 0;
-      if (type === 'A') { // 丝带(金)
+      if (type === 'A') { 
         const ribbonWidth = 0.08 * (1 - yNormalized);
         const r = baseR + (Math.random() - 0.5) * ribbonWidth * 12.0;
         x = Math.cos(theta) * r;
         z = Math.sin(theta) * r;
         sizes[i] = 0.06 + Math.random() * 0.1;
         opacities[i] = 0.5 + Math.random() * 0.4;
-      } else if (type === 'B') { // 星云(蓝)
+      } else if (type === 'B') { 
         const r = Math.sqrt(Math.random()) * baseR * 1.25; 
         const randAngle = Math.random() * Math.PI * 2;
         x = Math.cos(randAngle) * r;
         z = Math.sin(randAngle) * r;
         sizes[i] = 0.07 + Math.random() * 0.15;
         opacities[i] = 0.2 + Math.random() * 0.3;
-      } else { // 闪光(金)
+      } else { 
         const r = baseR * Math.sqrt(Math.random()) * 1.4;
         const randAngle = Math.random() * Math.PI * 2;
         x = Math.cos(randAngle) * r;
@@ -232,7 +231,6 @@ export const ChristmasTree: React.FC = () => {
           <pointsMaterial 
             color="#FFD700" 
             map={glowTexture}
-            // 金色保持细腻，透明度降低，防止过曝变白
             size={0.4} 
             transparent 
             opacity={0.4} 
@@ -245,19 +243,16 @@ export const ChristmasTree: React.FC = () => {
         )}
       </points>
 
-      {/* 3. 蓝色星云 (核心修改) */}
+      {/* 3. 蓝色星云 */}
       <points ref={nebulaRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT_B} array={systemB.currPos} itemSize={3} />
         </bufferGeometry>
         <pointsMaterial 
-            // 🟢 颜色改深：使用纯度极高的深蓝 (#0033FF)，确保叠加后依然是蓝色
             color="#0033FF" 
             map={glowTexture}
-            // 🟢 尺寸微调：0.3 足够看清颜色
             size={isMobile ? 0.3 : 0.11} 
             transparent 
-            // 🟢 亮度提升：0.35 (比金色的 0.15 高很多)，确保蓝色占主导
             opacity={0.35} 
             blending={THREE.AdditiveBlending} 
             depthWrite={false} 
@@ -280,13 +275,24 @@ export const ChristmasTree: React.FC = () => {
         />
       </points>
 
-      {/* 5. 顶部星星 */}
+      {/* 5. 顶部星星 (核心修改区域) */}
       <Float speed={2.5} rotationIntensity={0.2} floatIntensity={0.3}>
         <group ref={starRef} position={[0, 4.25, 0]}>
           <mesh rotation={[0, 0, 0]} position={[0, 0, -0.06]}>
             <extrudeGeometry args={[starShape, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 5 }]} />
             {isMobile ? (
-               <meshBasicMaterial color="#FFD700" /> 
+               // 🟢 手机端修改：从 BasicMaterial 改为 StandardMaterial 以支持发光
+               <meshStandardMaterial 
+                   color="#FFD700"
+                   emissive="#FFD700"
+                   // 强度给到 20，足够触发手机端的 Bloom 效果
+                   emissiveIntensity={20}
+                   // 关键：关闭色调映射，让亮度溢出产生辉光
+                   toneMapped={false}
+                   // 稍微粗糙一点，避免手机端镜面反射计算过重
+                   roughness={0.3}
+                   metalness={0.8}
+               /> 
             ) : (
                <meshStandardMaterial 
                 color="#FFD700" 
@@ -298,6 +304,7 @@ export const ChristmasTree: React.FC = () => {
               />
             )}
           </mesh>
+          {/* 这里的点光源照亮周围的烟雾，保持不变 */}
           <pointLight intensity={isMobile ? 50 : 250} distance={25} color="#FFD700" decay={2} />
         </group>
       </Float>
